@@ -1,106 +1,141 @@
-#include "DocumentParser.h"
+#include "DParser.h"
 
-// Constructor
-DocumentParser::DocumentParser() : indexHandler(nullptr) {}
+DocumentParser::DocumentParser() {
+    loadStopWords();
+    indexHandler = nullptr;
+}
 
-// Set the IndexHandler instance
-void DocumentParser::setIndexHandler(DocumentHandler* handler) {
+void DocumentParser::setIndexHandler(IndexHandler* handler) {
     indexHandler = handler;
 }
 
-// Reads and loads stopwords from a file
 void DocumentParser::loadStopWords() {
-    ifstream stopWordsFile("stopwords.txt");
-    if (!stopWordsFile.is_open()) {
-        throw runtime_error("Failed to open stopwords file.");
+    ifstream inputFile("../stopwords.txt");
+    if (!inputFile.is_open()) {
+        cerr << "Error: Unable to open stopwords file" << endl;
+        exit(EXIT_FAILURE);
     }
 
+    stopwords.clear();
     string word;
-    while (getline(stopWordsFile, word)) {
+    while (getline(inputFile, word)) {
+        if (word.empty()) continue;
+        trim(word); 
+        stem(word); 
         stopwords.insert(word);
     }
-    stopWordsFile.close();
+    inputFile.close();
 }
 
-// Processes all files in the given directory
-void DocumentParser::processDirectory(const string& folderPath) {
-    for (const auto& entry : filesystem::directory_iterator(folderPath)) {
+void DocumentParser::processDirectory(const string& directoryPath) {
+    for (const auto& entry : filesystem::recursive_directory_iterator(directoryPath)) {
         if (entry.is_regular_file() && entry.path().extension() == ".json") {
             parseJsonFile(entry.path().string());
         }
     }
 }
 
-// Parses a JSON file to extract relevant document information
-void DocumentParser::parseJsonFile(const string& jsonFilePath) {
-    ifstream jsonFile(jsonFilePath);
-    if (!jsonFile.is_open()) {
-        throw runtime_error("Failed to open JSON file: " + jsonFilePath);
+void DocumentParser::parseJsonFile(const string& filePath) {
+    ifstream inputFile(filePath);
+    if (!inputFile.is_open()) {
+        cerr << "Error: Unable to open file " << filePath << endl;
+        exit(EXIT_FAILURE);
     }
 
-    IStreamWrapper isw(jsonFile);
-    Document document;
-    document.ParseStream(isw);
+    IStreamWrapper jsonStream(inputFile);
+    Document jsonDoc;
+    jsonDoc.ParseStream(jsonStream);
 
-    if (document.HasParseError()) {
-        throw runtime_error("Error parsing JSON file: " + jsonFilePath);
-    }
-
-    ParsedDocument parsedDoc;
-
-    // Extract document data if fields exist
-    if (document.HasMember("title") && document["title"].IsString()) {
-        parsedDoc.title = document["title"].GetString();
-    }
-    if (document.HasMember("publication") && document["publication"].IsString()) {
-        parsedDoc.publication = document["publication"].GetString();
-    }
-    if (document.HasMember("date") && document["date"].IsString()) {
-        parsedDoc.date = document["date"].GetString();
-    }
-    if (document.HasMember("text") && document["text"].IsString()) {
-        parsedDoc.text = document["text"].GetString();
+    if (jsonDoc.HasParseError()) {
+        cerr << "JSON parsing error in file " << filePath << ": " 
+             << jsonDoc.GetParseError() << " at offset " 
+             << jsonDoc.GetErrorOffset() << endl;
+        inputFile.close();
+        return;
     }
 
-    // Index document data if indexHandler is set
-    if (indexHandler) {
-        indexHandler->index(parsedDoc);
+    string textContent = jsonDoc["text"].GetString();
+    regex pattern("[A-Za-z]+"); 
+
+    sregex_token_iterator wordIterator(textContent.begin(), textContent.end(), pattern);
+    sregex_token_iterator wordEnd;
+
+    while (wordIterator != wordEnd) {
+        string token = *wordIterator++;
+        trim(token);
+        stem(token);
+
+        if (token.length() > 2 && stopwords.find(token) == stopwords.end()) {
+            if (indexHandler) {
+                indexHandler->addPhrase(token, filePath);
+            } else {
+                cerr << "Error: IndexHandler is not set." << endl;
+            }
+        }
     }
 
-    jsonFile.close();
+    for (const auto& person : jsonDoc["entities"]["persons"].GetArray()) {
+        stringstream nameStream(person["name"].GetString());
+        string name;
+
+        while (getline(nameStream, name, ' ')) {
+            trim(name);
+            stem(name);
+            if (!name.empty() && indexHandler) {
+                indexHandler->addPerson(name, filePath);
+            }
+        }
+    }
+
+    for (const auto& organization : jsonDoc["entities"]["organizations"].GetArray()) {
+        stringstream orgStream(organization["name"].GetString());
+        string orgName;
+
+        while (getline(orgStream, orgName, ' ')) {
+            trim(orgName);
+            stem(orgName);
+            if (!orgName.empty() && indexHandler) {
+                indexHandler->addOrganization(orgName, filePath);
+            }
+        }
+    }
+
+    inputFile.close();
 }
 
-// Collects essential document data based on file input
-ParsedDocument DocumentParser::fetchDocumentData(const string& fileName) {
-    ParsedDocument parsedDoc;
-
-    ifstream jsonFile(fileName);
-    if (!jsonFile.is_open()) {
-        throw runtime_error("Failed to open file: " + fileName);
+ParsedDocument DocumentParser::fetchDocumentData(const string& filePath) {
+    ifstream inputFile(filePath);
+    if (!inputFile.is_open()) {
+        cerr << "Error: Unable to open file " << filePath << endl;
+        exit(EXIT_FAILURE);
     }
 
-    IStreamWrapper isw(jsonFile);
-    Document document;
-    document.ParseStream(isw);
+    IStreamWrapper jsonStream(inputFile);
+    Document jsonDoc;
+    jsonDoc.ParseStream(jsonStream);
 
-    if (document.HasParseError()) {
-        throw runtime_error("Error parsing JSON file: " + fileName);
-    }
-
-    // Populate ParsedDocument structure
-    if (document.HasMember("title") && document["title"].IsString()) {
-        parsedDoc.title = document["title"].GetString();
-    }
-    if (document.HasMember("publication") && document["publication"].IsString()) {
-        parsedDoc.publication = document["publication"].GetString();
-    }
-    if (document.HasMember("date") && document["date"].IsString()) {
-        parsedDoc.date = document["date"].GetString();
-    }
-    if (document.HasMember("text") && document["text"].IsString()) {
-        parsedDoc.text = document["text"].GetString();
+    if (jsonDoc.HasParseError()) {
+        cerr << "JSON parsing error in file " << filePath << ": " 
+             << jsonDoc.GetParseError() << " at offset " 
+             << jsonDoc.GetErrorOffset() << endl;
+        inputFile.close();
+        exit(EXIT_FAILURE);
     }
 
-    jsonFile.close();
-    return parsedDoc;
+    ParsedDocument docData;
+    if (jsonDoc.HasMember("title") && jsonDoc["title"].IsString()) {
+        docData.title = jsonDoc["title"].GetString();
+    }
+    if (jsonDoc.HasMember("thread") && jsonDoc["thread"]["site"].IsString()) {
+        docData.publication = jsonDoc["thread"]["site"].GetString();
+    }
+    if (jsonDoc.HasMember("text") && jsonDoc["text"].IsString()) {
+        docData.text = jsonDoc["text"].GetString();
+    }
+    if (jsonDoc.HasMember("published") && jsonDoc["published"].IsString()) {
+        docData.date = jsonDoc["published"].GetString();
+    }
+
+    inputFile.close();
+    return docData;
 }
