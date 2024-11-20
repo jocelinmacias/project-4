@@ -1,7 +1,7 @@
 #ifndef PROJECT4_DOCUPAR_H
 #define PROJECT4_DOCUPAR_H
 
-#include "IHandler.h"
+#include "IndexHandler.h"
 #include "porter2_stemmer.h"
 #include "rapidjson/document.h"
 #include "rapidjson/istreamwrapper.h"
@@ -27,7 +27,7 @@ struct ParsedDocument {
 class DocumentParser {
 private:
     // pointer to IndexHandler for shared functionality
-    DocumentHandler* indexHandler;
+    IndexHandler* indexHandler;
     unordered_set<string> stopwords;
 
 public:
@@ -35,7 +35,7 @@ public:
     DocumentParser();
 
     // Set the IndexHandler instance (no deep copy)
-    void setIndexHandler(DocumentHandler* handler);
+    void setIndexHandler(IndexHandler* handler);
 
     // Reads and loads stopwords from a file
     void loadStopWords();

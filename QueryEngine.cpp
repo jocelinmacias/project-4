@@ -21,7 +21,7 @@ vector<pair<double, string> > QueryEngine::parseQuery(string query) {
     stem(terms[0]);
 
     //getter form teh text tree and calling it
-    map <string,int> results = ih->getWord(terms[0]);
+    map <string,int> results = ih->getPhraseData(terms[0]);
 
     //for the documents
     for (int i = 0; i < terms.size();i++ ){
@@ -33,7 +33,7 @@ vector<pair<double, string> > QueryEngine::parseQuery(string query) {
             stem(word);
 
             //create a new map only for the results of that one word
-            map<string, int> docs = ih->getWord(word);
+            map<string, int> docs = ih->getPhraseData(word);
 
             //iterates throufh the map
             for(const pair<string, int> & itr: docs){
@@ -53,7 +53,7 @@ vector<pair<double, string> > QueryEngine::parseQuery(string query) {
             stem(org);
 
             //getter from the tree in the index handler
-            map<string, int> docs = ih->getOrg(org);
+            map<string, int> docs = ih->getOrganizationData(org);
 
 
             //iterate through the results
@@ -76,7 +76,7 @@ vector<pair<double, string> > QueryEngine::parseQuery(string query) {
             stem(person);
 
             //getter from the tree in the index handler
-            map<string, int> docs = ih->getPeo(person);
+            map<string, int> docs = ih->getPersonData(person);
 
 
             //iterate through the results
@@ -99,7 +99,7 @@ vector<pair<double, string> > QueryEngine::parseQuery(string query) {
             stem(word);
 
             //getter from the tree in the index handler
-            map<string, int> docs = ih->getWord(word);
+            map<string, int> docs = ih->getPhraseData(word);
 
 
             //iterate through the results
@@ -131,7 +131,7 @@ vector<pair<double, string> > QueryEngine::sortRelevency(map<string, int> & resu
     for( const pair<string,int>& itr: results){
 
         //declaring it and establishing the value by formulating the equation using DocCount
-        double relevancy = (double )(itr.second)/ih->getDocCount((itr.first));
+        double relevancy = (double )(itr.second)/ih->getDocumentFrequency((itr.first));
         sortedResults.push_back(make_pair(relevancy, itr.first));
     }
     //retunr the merge sort of sorted results
