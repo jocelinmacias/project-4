@@ -5,7 +5,7 @@
 #ifndef PROJECT4_QUERYENGINE_H
 #define PROJECT4_QUERYENGINE_H
 
-#include "InHan.h"
+#include "IndexHandler.h"
 #include "porter2_stemmer.h"
 
 
@@ -16,12 +16,12 @@ using namespace Porter2Stemmer;
 
 class QueryEngine {
 private:
-    InHan* ih;
+    IndexHandler* ih;
 public:
 
     //do something for this
     QueryEngine();
-    void setIndex(InHan *i) {
+    void setIndex(IndexHandler *i) {
         //shallow copy
         ih = i;
     }
